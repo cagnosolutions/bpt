@@ -76,6 +76,39 @@ func print_leaves(root *node) {
 	fmt.Printf("\n")
 }
 
+func find_all_records(root *node) []*record {
+	// node is empty, can't do much
+	if root == nil {
+		return nil
+	}
+	var c *node = root
+	// traverse down left side of tree
+	// until we find the first leaf node
+	for !c.is_leaf {
+		c = c.ptrs[0].(*node)
+	}
+	var i int
+	var r []*record
+	for {
+		// found first leaf. enumerate leaf node's
+		// ptrs sending each data record onto channel.
+		for i = 0; i < c.num_keys; i++ {
+			if c.ptrs[i] != nil {
+				r = append(r, c.ptrs[i].(*record))
+			}
+		}
+		// finally, utilize last ptr of leaf node
+		// to jump to the next leaf. continue until
+		// all leaves have been enumerated
+		if c.ptrs[ORDER-1] != nil {
+			c = c.ptrs[ORDER-1].(*node)
+		} else {
+			break // last leaf, stop enumerating
+		}
+	}
+	return r
+}
+
 // utility to give the height of the tree
 func height(root *node) int {
 	var h int

@@ -26,6 +26,17 @@ func (t *tree) Get(key []byte) []byte {
 	return r.value
 }
 
+func (t *tree) GetAll() [][]byte {
+	r := find_all_records(t.root)
+	var data [][]byte
+	if r != nil {
+		for _, v := range r {
+			data = append(data, v.value)
+		}
+	}
+	return data
+}
+
 func (t *tree) Del(key []byte) {
 	t.root = delete(t.root, key)
 }
@@ -45,6 +56,13 @@ func main() {
 		uuid := UUID()
 		t.Set(uuid, uuid)
 	}
+
+	log.Printf("Enumerating all leaf nodes; finding all records...\n")
+	d := t.GetAll()
+	for i, e := range d {
+		fmt.Printf("Record #%d: [% x]\n", i, e)
+	}
+	//log.Printf("Found %d records, the last 5 records are...\n[% x]\n[% x]\n[% x]\n[% x]\n[% x]\n", len(d), d[len(d)-5], d[len(d)-4], d[len(d)-3], d[len(d)-2], d[len(d)-1])
 
 	/*
 		log.Printf("Attempting to get all key/value paris from tree...\n")
