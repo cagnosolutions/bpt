@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+go run -race tree.go bpt.go uuid.go

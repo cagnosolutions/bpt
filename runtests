@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+go test -v -parallel 4 -bench=. -benchmem
