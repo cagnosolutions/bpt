@@ -1,6 +1,4 @@
-package main
-
-//package bpt
+package bpt
 
 import (
 	"bytes"
@@ -179,10 +177,6 @@ func find_leaf(root *node, key []byte) *node {
 			} else {
 				break
 			}
-		}
-		// TODO: DEBUG LINE
-		if c.ptrs[i] == nil {
-			log.Printf(">> i=%d, c.num_keys=%d, c.ptrs=%+v\n", i, c.num_keys, c.ptrs)
 		}
 		c = c.ptrs[i].(*node)
 	}
