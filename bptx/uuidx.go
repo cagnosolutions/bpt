@@ -1,4 +1,4 @@
-package bpt
+package bptx
 
 import (
 	"crypto/rand"

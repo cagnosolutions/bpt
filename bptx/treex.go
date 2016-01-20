@@ -1,4 +1,4 @@
-package bpt
+package bptx
 
 type tree struct {
 	root *node
