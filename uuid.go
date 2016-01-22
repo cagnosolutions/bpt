@@ -40,7 +40,7 @@ func UUID() []byte {
 	rand.Read(b[:])
 	clockSeq := binary.LittleEndian.Uint16(b[:])
 	clockSeq &= 0x3FFF
-	u := make([]byte, 16)
+	u := make([]byte, 16) // LOTS OF MEMORY BEING USED...
 	binary.LittleEndian.PutUint32(u[0:4], uint32(t&(0x100000000-1)))
 	binary.LittleEndian.PutUint16(u[4:6], uint16((t>>32)&0xFFFF))
 	binary.LittleEndian.PutUint16(u[6:8], uint16((t>>48)&0x0FFF))

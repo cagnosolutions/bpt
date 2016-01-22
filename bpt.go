@@ -172,13 +172,13 @@ func find_leaf(root *node, key []byte) *node {
 	for !c.is_leaf {
 		i = 0
 		for i < c.num_keys {
-			if bytes.Compare(key, c.keys[i]) >= 0 {
+			if bytes.Compare(key, c.keys[i]) >= 0 { // TODO: SLOW...
 				i++
 			} else {
 				break
 			}
 		}
-		c = c.ptrs[i].(*node)
+		c = c.ptrs[i].(*node) // TODO: SLOW...
 	}
 	return c
 }
@@ -203,7 +203,7 @@ func find(root *node, key []byte) *record {
 	}
 	var i int
 	for i = 0; i < c.num_keys; i++ {
-		if bytes.Equal(c.keys[i], key) {
+		if bytes.Equal(c.keys[i], key) { // TODO: SLOW...
 			break
 		}
 	}
@@ -267,9 +267,9 @@ func insert_into_leaf(leaf *node, key []byte, ptr *record) *node {
 	for insertion_point < leaf.num_keys && bytes.Compare(leaf.keys[insertion_point], key) == -1 {
 		insertion_point++
 	}
-	for i = leaf.num_keys; i > insertion_point; i-- {
-		leaf.keys[i] = leaf.keys[i-1]
-		leaf.ptrs[i] = leaf.ptrs[i-1]
+	for i = leaf.num_keys; i > insertion_point; i-- { //TODO: SLOW...
+		leaf.keys[i] = leaf.keys[i-1] // TODO: SLOW...
+		leaf.ptrs[i] = leaf.ptrs[i-1] // TODO: SLOW...
 	}
 	leaf.keys[insertion_point] = key
 	leaf.ptrs[insertion_point] = ptr
@@ -287,7 +287,7 @@ func insert_into_leaf_after_splitting(root, leaf *node, key []byte, ptr *record)
 	var insertion_index, split, i, j int
 	var new_key []byte
 
-	new_leaf = make_leaf()
+	new_leaf = make_leaf() // TODO: LOTS OF RAM USED...
 
 	for insertion_index < ORDER-1 && bytes.Compare(leaf.keys[insertion_index], key) == -1 {
 		insertion_index++
@@ -479,7 +479,7 @@ func insert(root *node, key []byte, val []byte) *node {
 		return root
 	}
 
-	ptr = make_record(val)
+	ptr = make_record(val) // TODO: LOTS OF RAM USED...
 
 	if root == nil {
 		return start_new_tree(key, ptr)

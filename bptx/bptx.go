@@ -2,216 +2,17 @@ package bptx
 
 import (
 	"bytes"
-	"fmt"
 	"log"
 )
 
-const ORDER = 64
+const order = 64
 
-type record struct {
-	value []byte
+func comp(k1, k2 []byte) bool {
+	return bytes.Compare(k1, k2) >= 0
 }
 
-type node struct {
-	num_keys int
-	keys     [][]byte
-	ptrs     []interface{}
-	parent   *node
-	next     *node
-	is_leaf  bool
-}
-
-var queue *node = nil
-
-// helper function for printing the
-// tree out. (see print_tree)
-func enqueue(new_node *node) {
-	var c *node
-	if queue == nil {
-		queue = new_node
-		queue.next = nil
-	} else {
-		c = queue
-		for c.next != nil {
-			c = c.next
-		}
-		c.next = new_node
-		new_node.next = nil
-	}
-}
-
-// helper function for printing the
-// tree out. (see print_tree)
-func dequeue() *node {
-	var n *node = queue
-	queue = queue.next
-	n.next = nil
-	return n
-}
-
-// prints the bottom row of keys of the tree
-func print_leaves(root *node) {
-	var i int
-	var c *node = root
-	if root == nil {
-		fmt.Printf("Empty tree.\n")
-		return
-	}
-	for !c.is_leaf {
-		c = c.ptrs[0].(*node)
-	}
-	for {
-		for i = 0; i < c.num_keys; i++ {
-			fmt.Printf("%s ", c.keys[i])
-		}
-		if c.ptrs[ORDER-1] != nil {
-			fmt.Printf(" | ")
-			c = c.ptrs[ORDER-1].(*node)
-		} else {
-			break
-		}
-	}
-	fmt.Printf("\n")
-}
-
-func find_all_records(root *node) []*record {
-	// node is empty, can't do much
-	if root == nil {
-		return nil
-	}
-	var c *node = root
-	// traverse down left side of tree
-	// until we find the first leaf node
-	for !c.is_leaf {
-		c = c.ptrs[0].(*node)
-	}
-	var i int
-	var r []*record
-	for {
-		// found first leaf. enumerate leaf node's
-		// ptrs sending each data record onto channel.
-		for i = 0; i < c.num_keys; i++ {
-			if c.ptrs[i] != nil {
-				r = append(r, c.ptrs[i].(*record))
-			}
-		}
-		// finally, utilize last ptr of leaf node
-		// to jump to the next leaf. continue until
-		// all leaves have been enumerated
-		if c.ptrs[ORDER-1] != nil {
-			c = c.ptrs[ORDER-1].(*node)
-		} else {
-			break // last leaf, stop enumerating
-		}
-	}
-	return r
-}
-
-// utility to give the height of the tree
-func height(root *node) int {
-	var h int
-	var c *node = root
-	for !c.is_leaf {
-		c = c.ptrs[0].(*node)
-		h++
-	}
-	return h
-}
-
-// utility function to give the length in edges
-// for the path from any node to the root
-func path_to_root(root, child *node) int {
-	var length int
-	var c *node = child
-	for c != root {
-		c = c.parent
-		length++
-	}
-	return length
-}
-
-// print tree out
-func print_tree(root *node) {
-	var n *node = nil
-	var i, rank, new_rank int
-	if root == nil {
-		fmt.Printf("Empty tree.\n")
-		return
-	}
-	queue = nil
-	enqueue(root)
-	for queue != nil {
-		n = dequeue()
-		if n.parent != nil && n == n.parent.ptrs[0] {
-			new_rank = path_to_root(root, n)
-			if new_rank != rank {
-				rank = new_rank
-				fmt.Printf("\n")
-			}
-		}
-		for i = 0; i < n.num_keys; i++ {
-			fmt.Printf("%s ", n.keys[i])
-		}
-		if !n.is_leaf {
-			for i = 0; i <= n.num_keys; i++ {
-				enqueue(n.ptrs[i].(*node))
-			}
-		}
-		fmt.Printf("| ")
-	}
-	fmt.Printf("\n")
-}
-
-// find leaf type node for a given key
-func find_leaf(root *node, key []byte) *node {
-	var c *node = root
-	if c == nil {
-		return c
-	}
-	var i int
-	for !c.is_leaf {
-		i = 0
-		for i < c.num_keys {
-			if bytes.Compare(key, c.keys[i]) >= 0 {
-				i++
-			} else {
-				break
-			}
-		}
-		c = c.ptrs[i].(*node)
-	}
-	return c
-}
-
-// find first leaf
-func find_first_leaf(root *node) *node {
-	if root == nil {
-		return root
-	}
-	var c *node = root
-	for !c.is_leaf {
-		c = c.ptrs[0].(*node)
-	}
-	return c
-}
-
-// find record for a given key
-func find(root *node, key []byte) *record {
-	var c *node = find_leaf(root, key)
-	if c == nil {
-		return nil
-	}
-	var i int
-	for i = 0; i < c.num_keys; i++ {
-		if bytes.Equal(c.keys[i], key) {
-			break
-		}
-	}
-	if i == c.num_keys {
-		return nil
-	}
-	return c.ptrs[i].(*record)
-
+func equal(k1, k2 []byte) bool {
+	return bytes.Equal(k1, k2)
 }
 
 // find split point of full node
@@ -222,32 +23,91 @@ func cut(length int) int {
 	return length/2 + 1
 }
 
-// create a record to hold a value for a given key
-func make_record(val []byte) *record {
-	return &record{
-		value: val,
+// data record
+type rec struct {
+	data []byte
+}
+
+// create a rec to hold a data for a given key
+func make_rec(v []byte) *rec {
+	return &rec{
+		data: v,
 	}
+}
+
+// tree node
+type node struct {
+	num_keys int
+	keys     [][]byte
+	ptrs     []interface{}
+	parent   *node
+	next     *node
+	is_leaf  bool
 }
 
 // create a new general node... can be adapted
 // to serve as either an internal or leaf node
 func make_node() *node {
 	return &node{
-		num_keys: 0,
-		keys:     make([][]byte, ORDER-1),
-		ptrs:     make([]interface{}, ORDER),
-		parent:   nil,
-		next:     nil,
-		is_leaf:  false,
+		keys: make([][]byte, order-1),
+		ptrs: make([]interface{}, order),
 	}
 }
 
-// create a new leaf node by addapting a general node
-func make_leaf() *node {
-	var leaf *node
-	leaf = make_node()
-	leaf.is_leaf = true
-	return leaf
+func find_all(n *node) []*rec {
+	if n == nil {
+		return nil
+	}
+	for !n.is_leaf {
+		n = n.ptrs[0].(*node)
+	}
+	var r []*rec
+	for {
+		for i := 0; i < n.num_keys && n.ptrs[i] != nil; i++ {
+			r = append(r, n.ptrs[i].(*rec))
+		}
+		if n.ptrs[order-1] != nil {
+			n = n.ptrs[order-1].(*node)
+		} else {
+			break
+		}
+	}
+	return r
+}
+
+func find_leaf(n *node, k []byte) *node {
+	if n == nil {
+		return n
+	}
+	var i int
+	for !n.is_leaf {
+		i = 0
+		for i < n.num_keys {
+			if comp(k, n.keys[i]) {
+				i++
+			} else {
+				break
+			}
+		}
+		n = n.ptrs[i].(*node)
+	}
+	return n
+}
+
+func find(n *node, k []byte) *rec {
+	var l *node
+	l = find_leaf(n, k)
+	if l == nil {
+		return nil
+	}
+	var i int
+	for i < l.num_keys && !equal(l.keys[i], k) {
+		i++
+	}
+	if i < l.num_keys {
+		return l.ptrs[i].(*rec)
+	}
+	return nil
 }
 
 // helper->insert_into_parent
@@ -261,35 +121,36 @@ func get_left_index(parent, left *node) int {
 	return left_index
 }
 
-// inserts a new key and *record into a leaf, then returns leaf
-func insert_into_leaf(leaf *node, key []byte, ptr *record) *node {
+// inserts a new key and *rec into a leaf, then returns leaf
+func insert_into_leaf(leaf *node, k []byte, ptr *rec) *node {
 	var i, insertion_point int
-	for insertion_point < leaf.num_keys && bytes.Compare(leaf.keys[insertion_point], key) == -1 {
+	for insertion_point < leaf.num_keys && !comp(leaf.keys[insertion_point], k) {
 		insertion_point++
 	}
 	for i = leaf.num_keys; i > insertion_point; i-- {
 		leaf.keys[i] = leaf.keys[i-1]
 		leaf.ptrs[i] = leaf.ptrs[i-1]
 	}
-	leaf.keys[insertion_point] = key
+	leaf.keys[insertion_point] = k
 	leaf.ptrs[insertion_point] = ptr
 	leaf.num_keys++
 	return leaf
 }
 
-// inserts a new key and *record into a leaf, so as
+// inserts a new key and *rec into a leaf, so as
 // to exceed the order, causing the leaf to be split
-func insert_into_leaf_after_splitting(root, leaf *node, key []byte, ptr *record) *node {
+func insert_into_leaf_after_splitting(root, leaf *node, k []byte, ptr *rec) *node {
 
 	var new_leaf *node
-	var tmp_keys [ORDER][]byte
-	var tmp_ptrs [ORDER]interface{}
+	var tmp_keys [order][]byte
+	var tmp_ptrs [order]interface{}
 	var insertion_index, split, i, j int
 	var new_key []byte
 
-	new_leaf = make_leaf()
+	new_leaf = make_node()
+	new_leaf.is_leaf = true
 
-	for insertion_index < ORDER-1 && bytes.Compare(leaf.keys[insertion_index], key) == -1 {
+	for insertion_index < order-1 && !comp(leaf.keys[insertion_index], k) {
 		insertion_index++
 	}
 
@@ -302,12 +163,12 @@ func insert_into_leaf_after_splitting(root, leaf *node, key []byte, ptr *record)
 		i++
 		j++
 	}
-	tmp_keys[insertion_index] = key
+	tmp_keys[insertion_index] = k
 	tmp_ptrs[insertion_index] = ptr
 
 	leaf.num_keys = 0
 
-	split = cut(ORDER - 1)
+	split = cut(order - 1)
 
 	for i = 0; i < split; i++ {
 		leaf.ptrs[i] = tmp_ptrs[i]
@@ -316,7 +177,7 @@ func insert_into_leaf_after_splitting(root, leaf *node, key []byte, ptr *record)
 	}
 
 	j = 0
-	for i = split; i < ORDER; i++ {
+	for i = split; i < order; i++ {
 		new_leaf.ptrs[j] = tmp_ptrs[i]
 		new_leaf.keys[j] = tmp_keys[i]
 		new_leaf.num_keys++
@@ -324,19 +185,19 @@ func insert_into_leaf_after_splitting(root, leaf *node, key []byte, ptr *record)
 	}
 
 	// freeing tmps...
-	for i = 0; i < ORDER; i++ {
+	for i = 0; i < order; i++ {
 		tmp_ptrs[i] = nil
 		tmp_keys[i] = nil
 	}
 
-	new_leaf.ptrs[ORDER-1] = leaf.ptrs[ORDER-1]
-	leaf.ptrs[ORDER-1] = new_leaf
+	new_leaf.ptrs[order-1] = leaf.ptrs[order-1]
+	leaf.ptrs[order-1] = new_leaf
 
-	for i = leaf.num_keys; i < ORDER-1; i++ {
+	for i = leaf.num_keys; i < order-1; i++ {
 		leaf.ptrs[i] = nil
 	}
 
-	for i = new_leaf.num_keys; i < ORDER-1; i++ {
+	for i = new_leaf.num_keys; i < order-1; i++ {
 		new_leaf.ptrs[i] = nil
 	}
 
@@ -347,24 +208,24 @@ func insert_into_leaf_after_splitting(root, leaf *node, key []byte, ptr *record)
 }
 
 // insert a new key, ptr to a node
-func insert_into_node(root, n *node, left_index int, key []byte, right *node) *node {
+func insert_into_node(root, n *node, left_index int, k []byte, right *node) *node {
 	var i int
 	for i = n.num_keys; i > left_index; i-- {
 		n.ptrs[i+1] = n.ptrs[i]
 		n.keys[i] = n.keys[i-1]
 	}
 	n.ptrs[left_index+1] = right
-	n.keys[left_index] = key
+	n.keys[left_index] = k
 	n.num_keys++
 	return root
 }
 
 // insert a new key, ptr to a node causing node to split
-func insert_into_node_after_splitting(root, old_node *node, left_index int, key []byte, right *node) *node {
+func insert_into_node_after_splitting(root, old_node *node, left_index int, k []byte, right *node) *node {
 	var i, j, split int
 	var new_node, child *node
-	var tmp_keys [ORDER][]byte
-	var tmp_ptrs [ORDER + 1]interface{}
+	var tmp_keys [order][]byte
+	var tmp_ptrs [order + 1]interface{}
 	var k_prime []byte
 
 	for i < old_node.num_keys+1 {
@@ -389,9 +250,9 @@ func insert_into_node_after_splitting(root, old_node *node, left_index int, key 
 	}
 
 	tmp_ptrs[left_index+1] = right
-	tmp_keys[left_index] = key
+	tmp_keys[left_index] = k
 
-	split = cut(ORDER)
+	split = cut(order)
 	new_node = make_node()
 	old_node.num_keys = 0
 
@@ -405,7 +266,7 @@ func insert_into_node_after_splitting(root, old_node *node, left_index int, key 
 	k_prime = tmp_keys[split-1]
 
 	j = 0
-	for i += 1; i < ORDER; i++ {
+	for i += 1; i < order; i++ {
 		new_node.ptrs[j] = tmp_ptrs[i]
 		new_node.keys[j] = tmp_keys[i]
 		new_node.num_keys++
@@ -415,11 +276,11 @@ func insert_into_node_after_splitting(root, old_node *node, left_index int, key 
 	new_node.ptrs[j] = tmp_ptrs[i]
 
 	// free tmps...
-	for i = 0; i < ORDER; i++ {
+	for i = 0; i < order; i++ {
 		tmp_keys[i] = nil
 		tmp_ptrs[i] = nil
 	}
-	tmp_ptrs[ORDER] = nil
+	tmp_ptrs[order] = nil
 
 	new_node.parent = old_node.parent
 
@@ -431,68 +292,55 @@ func insert_into_node_after_splitting(root, old_node *node, left_index int, key 
 }
 
 // insert a new node (leaf or internal) into tree, return root of tree
-func insert_into_parent(root, left *node, key []byte, right *node) *node {
+func insert_into_parent(root, left *node, k []byte, right *node) *node {
 	var left_index int
 	var parent *node
 	parent = left.parent
 	if parent == nil {
-		return insert_into_new_root(left, key, right)
+		return insert_into_new_root(left, k, right)
 	}
 	left_index = get_left_index(parent, left)
-	if parent.num_keys < ORDER-1 {
-		return insert_into_node(root, parent, left_index, key, right)
+	if parent.num_keys < order-1 {
+		return insert_into_node(root, parent, left_index, k, right)
 	}
-	return insert_into_node_after_splitting(root, parent, left_index, key, right)
+	return insert_into_node_after_splitting(root, parent, left_index, k, right)
 }
 
 // creates a new root for two sub-trees and inserts the key into the new root
-func insert_into_new_root(left *node, key []byte, right *node) *node {
-	var root *node = make_node()
-	root.keys[0] = key
-	root.ptrs[0] = left
-	root.ptrs[1] = right
-	root.num_keys++
-	root.parent = nil
-	left.parent = root
-	right.parent = root
-	return root
+func insert_into_new_root(left *node, k []byte, right *node) *node {
+	n := make_node()
+	n.keys[0], n.ptrs[0], n.ptrs[1] = k, left, right
+	n.num_keys++
+	left.parent = n
+	right.parent = n
+	return n
 }
 
 // first insertion, start a new tree
-func start_new_tree(key []byte, ptr *record) *node {
-	var root *node = make_leaf()
-	root.keys[0] = key
-	root.ptrs[0] = ptr
-	root.ptrs[ORDER-1] = nil
-	root.parent = nil
-	root.num_keys++
-	return root
+func start_new_tree(k []byte, ptr *rec) *node {
+	r := make_node()
+	r.is_leaf = true
+	r.keys[0], r.ptrs[0] = k, ptr
+	r.ptrs[order-1] = nil
+	r.num_keys++
+	return r
 }
 
 // master insert function
-func insert(root *node, key []byte, val []byte) *node {
-
-	var ptr *record
-	var leaf *node
-
-	if find(root, key) != nil {
-		return root
+func insert(n *node, k, v []byte) *node {
+	if find(n, k) != nil {
+		return n
 	}
-
-	ptr = make_record(val)
-
-	if root == nil {
-		return start_new_tree(key, ptr)
+	ptr := make_rec(v)
+	if n == nil {
+		return start_new_tree(k, ptr)
 	}
-
-	leaf = find_leaf(root, key)
-
-	if leaf.num_keys < ORDER-1 {
-		leaf = insert_into_leaf(leaf, key, ptr)
-		return root
+	leaf := find_leaf(n, k)
+	if leaf.num_keys < order-1 {
+		leaf = insert_into_leaf(leaf, k, ptr)
+		return n
 	}
-
-	return insert_into_leaf_after_splitting(root, leaf, key, ptr)
+	return insert_into_leaf_after_splitting(n, leaf, k, ptr)
 }
 
 // helper for delete methods... returns index of
@@ -508,10 +356,10 @@ func get_neighbor_index(n *node) int {
 	return 1
 }
 
-func remove_entry_from_node(n *node, key []byte, ptr interface{}) *node {
+func remove_entry_from_node(n *node, k []byte, ptr interface{}) *node {
 	var i, num_ptrs int
 	// remove key and shift over keys accordingly
-	for !bytes.Equal(n.keys[i], key) {
+	for !equal(n.keys[i], k) {
 		i++
 	}
 	for i += 1; i < n.num_keys; i++ {
@@ -528,10 +376,6 @@ func remove_entry_from_node(n *node, key []byte, ptr interface{}) *node {
 	for n.ptrs[i] != ptr {
 		i++
 	}
-
-	//for n.ptrs[i].(*node) != ptr {
-	//	i++
-	//}
 	for i += 1; i < num_ptrs; i++ {
 		n.ptrs[i-1] = n.ptrs[i]
 	}
@@ -540,11 +384,11 @@ func remove_entry_from_node(n *node, key []byte, ptr interface{}) *node {
 	// set other ptrs to nil for tidiness; remember leaf
 	// nodes use the last ptr to point to the next leaf
 	if n.is_leaf {
-		for i = n.num_keys; i < ORDER-1; i++ {
+		for i = n.num_keys; i < order-1; i++ {
 			n.ptrs[i] = nil
 		}
 	} else {
-		for i = n.num_keys + 1; i < ORDER; i++ {
+		for i = n.num_keys + 1; i < order; i++ {
 			n.ptrs[i] = nil
 		}
 	}
@@ -619,7 +463,7 @@ func coalesce_nodes(root, n, neighbor *node, neighbor_index int, k_prime []byte)
 			i++
 			j++
 		}
-		neighbor.ptrs[ORDER-1] = n.ptrs[ORDER-1]
+		neighbor.ptrs[order-1] = n.ptrs[order-1]
 	}
 	root = delete_entry(root, n.parent, k_prime, n)
 	n.keys = nil
@@ -682,19 +526,19 @@ func redistribute_nodes(root, n, neighbor *node, neighbor_index, k_prime_index i
 	return root
 }
 
-// deletes an entry from the tree; removes record, key, and ptr from leaf and rebalances tree
-func delete_entry(root, n *node, key []byte, ptr interface{}) *node {
+// deletes an entry from the tree; removes rec, key, and ptr from leaf and rebalances tree
+func delete_entry(root, n *node, k []byte, ptr interface{}) *node {
 	var min_keys, neighbor_index, k_prime_index, capacity int
 	var neighbor *node
 	var k_prime []byte
 
 	// remove key, ptr from node
-	n = remove_entry_from_node(n, key, ptr)
+	n = remove_entry_from_node(n, k, ptr)
 	//switch ptr.(type) {
 	//case *node:
 	//	n = remove_entry_from_node(n, key, ptr.(*node))
-	//case *record:
-	//	n = remove_entry_from_node(n, key, ptr.(*record))
+	//case *rec:
+	//	n = remove_entry_from_node(n, key, ptr.(*rec))
 	//}
 	if n == root {
 		return adjust_root(root)
@@ -702,9 +546,9 @@ func delete_entry(root, n *node, key []byte, ptr interface{}) *node {
 
 	// case: delete from inner node
 	if n.is_leaf {
-		min_keys = cut(ORDER - 1)
+		min_keys = cut(order - 1)
 	} else {
-		min_keys = cut(ORDER) - 1
+		min_keys = cut(order) - 1
 	}
 	// case: node stays at or above min order
 	if n.num_keys >= min_keys {
@@ -725,9 +569,9 @@ func delete_entry(root, n *node, key []byte, ptr interface{}) *node {
 		neighbor = n.parent.ptrs[neighbor_index].(*node)
 	}
 	if n.is_leaf {
-		capacity = ORDER
+		capacity = order
 	} else {
-		capacity = ORDER - 1
+		capacity = order - 1
 	}
 
 	// coalescence
@@ -738,15 +582,15 @@ func delete_entry(root, n *node, key []byte, ptr interface{}) *node {
 }
 
 // master delete
-func delete(root *node, key []byte) *node {
+func delete(root *node, k []byte) *node {
 	var key_leaf *node
-	var key_record *record
+	var key_rec *rec
 
-	key_record = find(root, key)
-	key_leaf = find_leaf(root, key)
-	if key_record != nil && key_leaf != nil {
-		root = delete_entry(root, key_leaf, key, key_record)
-		key_record = nil // free key_record
+	key_rec = find(root, k)
+	key_leaf = find_leaf(root, k)
+	if key_rec != nil && key_leaf != nil {
+		root = delete_entry(root, key_leaf, k, key_rec)
+		key_rec = nil // free key_rec
 	}
 	return root
 }

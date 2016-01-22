@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+PROG=prof.go
+go build $PROG
+COUNT=0
+while [ $COUNT -lt 1 ]; do
+	./${PROG%.*}
+	let COUNT=COUNT+1
+done 
+go tool pprof -png -lines -call_tree ${PROG%.*} cpu.pprof > ${PROG%.*}.png
+go clean
+xdg-open ${PROG%.*}.png
