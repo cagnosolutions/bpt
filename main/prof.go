@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/cagnosolutions/bpt"
 	"github.com/pkg/profile"
 )
@@ -12,7 +14,7 @@ func main() {
 
 	t := bpt.NewTree()
 	for i := 0; i < 1000000; i++ {
-		x := bpt.UUID()
+		x := []byte(fmt.Sprintf("%x", i))
 		t.Set(x, x)
 	}
 	t.Close()

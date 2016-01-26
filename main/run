@@ -6,6 +6,6 @@ while [ $COUNT -lt 1 ]; do
 	./${PROG%.*}
 	let COUNT=COUNT+1
 done 
-go tool pprof -png -lines -call_tree ${PROG%.*} mem.pprof > ${PROG%.*}.png
+go tool pprof -png -cum -lines -call_tree ${PROG%.*} mem.pprof > ${PROG%.*}.png
 go clean
 xdg-open ${PROG%.*}.png

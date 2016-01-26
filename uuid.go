@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+var uuid [16]byte
+
 func init() {
 	cachedNodeId = getNodeId()
 }
@@ -40,7 +42,7 @@ func UUID() []byte {
 	rand.Read(b[:])
 	clockSeq := binary.LittleEndian.Uint16(b[:])
 	clockSeq &= 0x3FFF
-	u := make([]byte, 16) // LOTS OF MEMORY BEING USED...
+	var u = uuid // LOTS OF MEMORY BEING USED...
 	binary.LittleEndian.PutUint32(u[0:4], uint32(t&(0x100000000-1)))
 	binary.LittleEndian.PutUint16(u[4:6], uint16((t>>32)&0xFFFF))
 	binary.LittleEndian.PutUint16(u[6:8], uint16((t>>48)&0x0FFF))
@@ -49,5 +51,5 @@ func UUID() []byte {
 	u[8] &= 0x3F
 	u[8] |= 0x80
 	u[6] = (u[6] & 0x0F) | (0x01 << 4)
-	return u
+	return u[:]
 }

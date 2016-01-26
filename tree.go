@@ -17,6 +17,7 @@ func (t *tree) Get(key []byte) []byte {
 	return r.value
 }
 
+/*
 func (t *tree) GetAll() [][]byte {
 	r := find_all_records(t.root)
 	var data [][]byte
@@ -27,6 +28,7 @@ func (t *tree) GetAll() [][]byte {
 	}
 	return data
 }
+*/
 
 func (t *tree) Del(key []byte) {
 	t.root = delete(t.root, key)
