@@ -14,6 +14,11 @@ func BenchmarkBPlusTree(b *testing.B) {
 		x := bpt.UUID()
 		t.Set(x, x)
 	}
+	x := bpt.UUID()
+	t.Set(x, x)
+	if v, _ := t.Get(x); !bytes.Equal(v, x) {
+		b.Errorf("expected % x, got % x\n", x, v)
+	}
 }
 
 func BenchmarkBPT(b *testing.B) {
@@ -21,6 +26,11 @@ func BenchmarkBPT(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		x := bpt.UUID()
 		t.Set(x, x)
+	}
+	x := bpt.UUID()
+	t.Set(x, x)
+	if v := t.Get(x); !bytes.Equal(v, x) {
+		b.Errorf("expected % x, got % x\n", x, v)
 	}
 }
 

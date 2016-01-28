@@ -13,8 +13,10 @@ func (t *tree) Set(key []byte, val []byte) {
 }
 
 func (t *tree) Get(key []byte) []byte {
-	r := find(t.root, key)
-	return r.value
+	if r := find(t.root, key); r != nil {
+		return r.value
+	}
+	return nil
 }
 
 /*

@@ -2,15 +2,23 @@ package bpt
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"sort"
-	"sync"
+	"strings"
 )
 
 const order = 64
 
 type record struct {
 	value []byte
+}
+
+func cut(n int) int {
+	if n%2 == 0 {
+		return n / 2
+	}
+	return n/2 + 1
 }
 
 type node struct {
@@ -21,39 +29,18 @@ type node struct {
 	is_leaf  bool
 }
 
-func find_all_records(root *node) []*record {
-	// node is empty, can't do much
-	if root == nil {
-		return nil
-	}
-	var c *node = root
-	// traverse down left side of tree
-	// until we find the first leaf node
-	for !c.is_leaf {
-		c = c.ptrs[0].(*node)
-	}
-	var i int
-	var r []*record
-	for {
-		// found first leaf. enumerate leaf node's
-		// ptrs sending each data record onto channel.
-		for i = 0; i < c.num_keys; i++ {
-			if c.ptrs[i] != nil {
-				r = append(r, c.ptrs[i].(*record))
-			}
+func (n *node) String() string {
+	var ss []string
+	for _, key := range n.keys {
+		if key == nil {
+			key = []byte{byte(0)}
 		}
-		// finally, utilize last ptr of leaf node
-		// to jump to the next leaf. continue until
-		// all leaves have been enumerated
-		if c.ptrs[order-1] != nil {
-			c = c.ptrs[order-1].(*node)
-		} else {
-			break // last leaf, stop enumerating
-		}
+		ss = append(ss, fmt.Sprintf("%d", key))
 	}
-	return r
+	return "[" + strings.Join(ss, ",") + "]"
 }
 
+// OPTIMIZED
 func find_leaf(n *node, key []byte) *node {
 	if n == nil {
 		return n
@@ -67,132 +54,46 @@ func find_leaf(n *node, key []byte) *node {
 	return n
 }
 
-// find leaf type node for a given key
-func find_leafX(root *node, key []byte) *node {
-	var c *node = root
-	if c == nil {
-		return c
-	}
-	var i int
-	for !c.is_leaf {
-		i = 0
-		for i < c.num_keys {
-			if bytes.Compare(key, c.keys[i]) >= 0 { // TODO: SLOW...
-				i++
-			} else {
-				break
-			}
-		}
-		c = c.ptrs[i].(*node) // TODO: SLOW...
-	}
-	return c
-}
-
-// find first leaf
-func find_first_leaf(root *node) *node {
-	if root == nil {
-		return root
-	}
-	var c *node = root
-	for !c.is_leaf {
-		c = c.ptrs[0].(*node)
-	}
-	return c
-}
-
+// OPTIMIZED
 func find(n *node, key []byte) *record {
-	l := find_leaf(n, key)
-	if l == nil {
-		return nil
-	}
-	i := sort.Search(l.num_keys, func(i int) bool {
-		return bytes.Equal(l.keys[i], key)
-	})
-	if i == l.num_keys {
-		return nil
-	}
-	return l.ptrs[i].(*record)
-}
-
-// find record for a given key
-func findX(root *node, key []byte) *record {
-	var c *node = find_leaf(root, key)
-	if c == nil {
-		return nil
-	}
-	var i int
-	for i = 0; i < c.num_keys; i++ {
-		if len(c.keys[i]) == len(key) { // ADDED
-			if bytes.Equal(c.keys[i], key) { // TODO: SLOW...
+	if l := find_leaf(n, key); l != nil {
+		var i int
+		for i = 0; i < l.num_keys; i++ {
+			if bytes.Equal(l.keys[i], key) {
 				break
 			}
 		}
+		if i == l.num_keys {
+			return nil
+		}
+		return l.ptrs[i].(*record)
 	}
-	if i == c.num_keys {
-		return nil
-	}
-	return c.ptrs[i].(*record)
+	return nil
 }
 
-// find split point of full node
-func cut(length int) int {
-	if length%2 == 0 {
-		return length / 2
-	}
-	return length/2 + 1
-}
-
-// create a record to hold a value for a given key
-func make_record(val []byte) *record {
-	return &record{
-		value: val,
-	}
-}
-
-/*
-// create a new general node... can be adapted
-// to serve as either an internal or leaf node
-func make_node() *node {
-	return &node{
-		keys:     [order-1][]byte,
-		ptrs:     [order]interface{},
-	}
-}
-*/
-
-/*
-// create a new leaf node by addapting a general node
-func make_leaf() *node {
-	var leaf *node
-	leaf = make_node()
-	leaf.is_leaf = true
-	return leaf
-}
-*/
-
-// helper->insert_into_parent
-// used to find index of the parent's ptr to the
-// node to the left of the key to be inserted
+// OPTIMIZED
 func get_left_index(parent, left *node) int {
-	left_index := 0
-	for left_index <= parent.num_keys && parent.ptrs[left_index] != left {
-		left_index++
+	var i, j int
+	j = parent.num_keys
+	for i < j {
+		n := (i + (j-i)/2)
+		if parent.ptrs[n] != left {
+			i = n + 1
+		} else {
+			j = n
+		}
 	}
-	return left_index
+	return i
 }
 
-// inserts a new key and *record into a leaf, then returns leaf
+// OPTIMIZED
 func insert_into_leaf(leaf *node, key []byte, ptr *record) *node {
-	var insertion_point int
-	for insertion_point < leaf.num_keys && bytes.Compare(leaf.keys[insertion_point], key) == -1 {
-		insertion_point++
-	}
-	for i := leaf.num_keys; i > insertion_point; i-- { //TODO: SLOW...
-		leaf.keys[i] = leaf.keys[i-1] // TODO: SLOW...
-		leaf.ptrs[i] = leaf.ptrs[i-1] // TODO: SLOW...
-	}
-	leaf.keys[insertion_point] = key
-	leaf.ptrs[insertion_point] = ptr
+	i := sort.Search(leaf.num_keys, func(i int) bool {
+		return bytes.Compare(leaf.keys[i], key) >= 0
+	})
+	copy(leaf.keys[i+1:], leaf.keys[i:])
+	copy(leaf.ptrs[i+1:], leaf.ptrs[i:])
+	leaf.keys[i], leaf.ptrs[i] = key, ptr
 	leaf.num_keys++
 	return leaf
 }
@@ -201,13 +102,13 @@ func insert_into_leaf(leaf *node, key []byte, ptr *record) *node {
 // to exceed the order, causing the leaf to be split
 func insert_into_leaf_after_splitting(root, leaf *node, key []byte, ptr *record) *node {
 
-	insertion_index := (0 + leaf.num_keys + 1) >> 1
+	idx := (leaf.num_keys + 1) >> 1
 
 	var tmp_keys [order][]byte
 	var tmp_ptrs [order]interface{}
 
 	for i, j := 0, 0; i < leaf.num_keys; i, j = i+1, j+1 {
-		if j == insertion_index {
+		if j == idx {
 			j++
 		}
 		tmp_keys[j] = leaf.keys[i]
@@ -221,11 +122,11 @@ func insert_into_leaf_after_splitting(root, leaf *node, key []byte, ptr *record)
 	//var new_key []byte
 
 	/*
-		for insertion_index < order-1 && bytes.Compare(leaf.keys[insertion_index], key) == -1 {
-			insertion_index++
+		for idx < order-1 && bytes.Compare(leaf.keys[idx], key) == -1 {
+			idx++
 		}
 		for i < leaf.num_keys {
-			if j == insertion_index {
+			if j == idx {
 				j++
 			}
 			tmp_keys[j] = leaf.keys[i]
@@ -235,11 +136,12 @@ func insert_into_leaf_after_splitting(root, leaf *node, key []byte, ptr *record)
 		}
 	*/
 
-	tmp_keys[insertion_index] = key
-	tmp_ptrs[insertion_index] = ptr
+	tmp_keys[idx] = key
+	tmp_ptrs[idx] = ptr
 	leaf.num_keys = 0
 
 	split := cut(order - 1)
+	//split := order >> 1
 
 	for i := 0; i < split; i++ {
 		leaf.ptrs[i] = tmp_ptrs[i]
@@ -247,7 +149,9 @@ func insert_into_leaf_after_splitting(root, leaf *node, key []byte, ptr *record)
 		leaf.num_keys++
 	}
 
-	new_leaf := &node{is_leaf: true} //make_leaf() // TODO: LOTS OF RAM USED...
+	var new_leaf *node = new(node)
+	new_leaf.is_leaf = true
+	//new_leaf := &node{is_leaf: true} //make_leaf() // TODO: LOTS OF RAM USED...
 
 	for i, j := split, 0; i < order; i, j = i+1, j+1 {
 		new_leaf.ptrs[j] = tmp_ptrs[i]
@@ -288,7 +192,7 @@ func insert_into_node(root, n *node, left_index int, key []byte, right *node) *n
 
 // insert a new key, ptr to a node causing node to split
 func insert_into_node_after_splitting(root, old_node *node, left_index int, key []byte, right *node) *node {
-	var i, j, split int
+	var i, j int
 	var new_node, child *node
 	var tmp_keys [order][]byte
 	var tmp_ptrs [order + 1]interface{}
@@ -318,9 +222,12 @@ func insert_into_node_after_splitting(root, old_node *node, left_index int, key 
 	tmp_ptrs[left_index+1] = right
 	tmp_keys[left_index] = key
 
-	split = cut(order)
+	split := cut(order)
+	//split := (order + 1) >> 1
+
 	//new_node = make_node()
 	new_node = &node{}
+
 	old_node.num_keys = 0
 
 	for i = 0; i < split-1; i++ {
@@ -398,8 +305,6 @@ func start_new_tree(key []byte, ptr *record) *node {
 	root.num_keys++
 	return root
 }
-
-var recordPool = sync.Pool{New: func() interface{} { return &record{} }}
 
 // master insert function
 func insert(root *node, key []byte, val []byte) *node {
@@ -632,8 +537,10 @@ func delete_entry(root, n *node, key []byte, ptr interface{}) *node {
 	// case: delete from inner node
 	if n.is_leaf {
 		min_keys = cut(order - 1)
+		//min_keys = order >> 1
 	} else {
 		min_keys = cut(order) - 1
+		//min_keys = order >> 1
 	}
 	// case: node stays at or above min order
 	if n.num_keys >= min_keys {
